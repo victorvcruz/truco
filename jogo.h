@@ -47,8 +47,10 @@ typedef struct jogador{
 }Jogador;
 
 typedef struct mesa{
+    int pontosA;
+    int pontosB;
     struct jogador *jogadores;
-    unsigned char rodada;
+    int rodada;
     char resultado;
 }Mesa;
 
@@ -140,12 +142,15 @@ PilhaCarta * embaralhar(PilhaCarta *topo);
 
 Carta *pop(PilhaCarta *topo);
 
-void distribuir_cartas(Jogo *jogo);
+PilhaCarta *  distribuir_cartas(Jogo *jogo);
 
 Carta * escolherCarta(PilhaCarta *cartas);
 
 Carta * remover_carta(PilhaCarta *cartas, int posicao);
 
-void adicionar_carta(PilhaCarta *cartas, Carta *valor);
+PilhaCarta * adicionar_carta(PilhaCarta *cartas, Carta *valor);
 
+char verifica_carta(Carta *carta1, Carta * carta2, Carta * vira, PilhaCarta *ordemCartas) ;
+
+int verifica_naipe(Carta * carta);
 #endif //TRUCO_JOGO_H
