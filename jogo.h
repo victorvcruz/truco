@@ -113,7 +113,7 @@ char turnos_automatico(Jogo *jogo);
   retorno: resultados:
 
 */
-void partidas_manual(Jogo *jogo);
+void partidas(Jogo *jogo);
 
 
 /*
@@ -166,4 +166,7 @@ char mao_de_onze(Jogo * jogo, char time);
 
 void olharCartas(PilhaCarta *cartas);
 
+void scan(const char *__restrict format, int * aux, int r);
+
+void slp(unsigned int seconds);
 #endif //TRUCO_JOGO_H
