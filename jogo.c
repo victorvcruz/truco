@@ -6,14 +6,15 @@
 
 #define TOTAL_CARTAS 39
 
+char modo = 'N';
+
 int main() {
     srand(time(NULL));
-
     PilhaCarta *listaCartas = lerArq("cartas.txt");
-    Jogo *jogo = inicializa_estruturas(listaCartas);
     int modo;
     int aux = 1;
     while (aux == 1) {
+        Jogo *jogo = inicializa_estruturas(listaCartas);
         printf("Escolha o modo de jogo:\n");
         printf("1 - Manual\n");
         printf("2 - Automático\n");
@@ -21,9 +22,13 @@ int main() {
         scanf("%d", &modo);
         switch (modo) {
             case 1:
+                modo = 'M';
                 partidas_manual(jogo);
+                break;
             case 2:
+                modo = 'A';
                 //partidas_automatico(jogo);
+                break;
             case 3:
                 printf("Jogo Encerrado!");
                 aux = 0;
@@ -84,76 +89,255 @@ Jogo *inicializa_estruturas(PilhaCarta *listCartas) {
 
 void partidas_manual(Jogo *jogo) {
 
+    char trucoMaoOnze = 'N';
     while (verifica_vencedor(jogo) == 'N') {
         jogo->turno++;
         printf("-----Turno %d-----\n", jogo->turno);
-        PilhaCarta * baralho = distribuir_cartas(jogo);
+        printf("Time A: %d pontos\n", jogo->pontosA);
+        printf("Time B: %d pontos\n", jogo->pontosB);
+
+        PilhaCarta *baralho = distribuir_cartas(jogo);
         jogo->carta_virada = pop(baralho);
+
+        int ponto = 1;
+        int aposta = 1;
+
+        char maoOnze = 'N';
+        if (!(jogo->pontosA == 11 && jogo->pontosB == 11)) {
+            if (jogo->pontosA == 11) {
+                maoOnze = mao_de_onze(jogo, 'A');
+            } else if (jogo->pontosB == 11) {
+                maoOnze = mao_de_onze(jogo, 'B');
+            }
+
+            if (maoOnze == '1') {
+                printf("Mão de Onze aceita!\n");
+                ponto = 3;
+            } else if (maoOnze == '0') {
+                printf("Mão de Onze rejeitada!\n");
+                if (jogo->pontosA == 11) {
+                    printf("O time B ganhou %d ponto!\n", 1);
+                    jogo->pontosB = jogo->pontosB + 1;
+                } else {
+                    printf("O time A ganhou %d ponto!\n", 1);
+                    jogo->pontosA = jogo->pontosA + 1;
+                }
+                recolher_cartas(jogo);
+                continue;
+            }
+        }
 
         for (jogo->mesa->rodada = 0; jogo->mesa->rodada < 3; jogo->mesa->rodada++) {
             printf("\n----Rodada %d----\n", jogo->mesa->rodada + 1);
             printf("Carta virada: %c de %s\n", jogo->carta_virada->valor, jogo->carta_virada->naipe);
 
-            int ponto = 1;
-
             Jogador *jogador = jogo->jogador_que_distribuiu->prox;
-            Carta * maiorCarta = NULL;
+            Carta *maiorCarta = NULL;
             char timeMaiorCarta = 'N';
             int empate = 0;
             for (int j = 0; j < 4; j++) {
-                printf("\n--Jogador %s--\n", jogador->nome);
+                printf("--Jogador %s--\n", jogador->nome);
                 printf("Cartas:\n");
+                olharCartas(jogador->cartas);
+
+                ponto = aumentarAposta(ponto, maoOnze);
+                if (maoOnze == '1' && ponto == 0) {
+                    trucoMaoOnze = jogador->nome[0];
+                    break;
+                }
+
+                if (ponto != aposta) {
+                    aposta = aceitarAposta(ponto, jogador);
+                    if (aposta != ponto) {
+                        char time = jogador->nome[0];
+                        printf("Fim da rodada! O time %c ganhou %d pontos!\n", time, aposta);
+                        if (time == 'A') {
+                            jogo->pontosA = jogo->pontosA + aposta;
+                        } else {
+                            jogo->pontosB = jogo->pontosB + aposta;
+                        }
+                        break;
+                    }
+                }
+
+                printf("Escolha:\n");
 
                 PilhaCarta *cartas = jogador->cartas;
-                Carta * carta = escolherCarta(cartas);
+                Carta *carta = escolherCarta(cartas);
 
-                if(maiorCarta != NULL && strcmp(carta->naipe, maiorCarta->naipe) == 0 && carta->valor == maiorCarta->valor) {
+                if (maiorCarta != NULL && strcmp(carta->naipe, maiorCarta->naipe) == 0 &&
+                    carta->valor == maiorCarta->valor) {
                     empate = 1;
                 } else {
                     char maior = verifica_carta(carta, maiorCarta, jogo->carta_virada, jogo->lcartas);
-                    if(maior == '1') {
+                    if (maior == '1') {
                         timeMaiorCarta = jogador->nome[0];
                         maiorCarta = carta;
                     }
                     empate = 0;
                 }
 
-                printf("Carta jogada: %c de %s\n", carta->valor, carta->naipe);
+                mostrarCarta(jogo->mesa->rodada, carta, jogador);
                 jogador = jogador->prox;
             }
 
-            if(timeMaiorCarta == 'A') {
+            if(trucoMaoOnze != 'N') {
+                break;
+            }
+
+            if (aposta != ponto) {
+                break;
+            }
+
+            if(jogo->mesa->resultado[0] == 'E' && jogo->mesa->rodada == 1) {
+                if (timeMaiorCarta == 'A') {
+                    jogo->pontosA = jogo->pontosA + ponto;
+                    printf("Fim do turno! O time A ganhou %d pontos!\n", ponto);
+                    break;
+                } else {
+                    jogo->pontosB = jogo->pontosB + ponto;
+                    printf("Fim da turno! O time B ganhou %d pontos!\n", ponto);
+                    break;
+                }
+            }
+
+            if (empate == 1 && jogo->mesa->rodada == 1) {
+                if (jogo->mesa->resultado[0] == 'A') {
+                    jogo->pontosA = jogo->pontosA + ponto;
+                    printf("Fim do turno! O time A ganhou %d pontos!\n", ponto);
+                    break;
+                } else {
+                    jogo->pontosB = jogo->pontosB + ponto;
+                    printf("Fim da turno! O time B ganhou %d pontos!\n", ponto);
+                    break;
+                }
+            }
+
+            if (jogo->mesa->resultado[0] == 'E' && jogo->mesa->resultado[1] == 'E' && empate == 1 && jogo->mesa->rodada == 2) {
+                if (timeMaiorCarta == 'A') {
+                    jogo->pontosA = jogo->pontosA + ponto;
+                    printf("Fim do turno! O time A ganhou %d pontos!\n", ponto);
+                    break;
+                } else {
+                    jogo->pontosB = jogo->pontosB + ponto;
+                    printf("Fim do turno! O time B ganhou %d pontos!\n", ponto);
+                    break;
+                }
+            }
+
+            if (jogo->mesa->resultado[0] == 'E' && jogo->mesa->resultado[1] == 'E' && jogo->mesa->resultado[2] == 'E') {
+                printf("Fim da turno! Empate!\n");
+                break;
+            }
+
+            if (timeMaiorCarta == 'A') {
+                jogo->mesa->resultado[jogo->mesa->rodada] = 'A';
+                printf("Fim da rodada! Vence time A!\n");
                 jogo->mesa->pontosA++;
-            } else if(timeMaiorCarta == 'B') {
+            } else if (timeMaiorCarta == 'B') {
+                jogo->mesa->resultado[jogo->mesa->rodada] = 'B';
+                printf("Fim da rodada! Vence time B!\n");
                 jogo->mesa->pontosB++;
             }
 
-            if(empate == 1) {
-                jogo->mesa->pontosA++;
-                jogo->mesa->pontosB++;
+            if (empate == 1) {
+                jogo->mesa->resultado[jogo->mesa->rodada] = 'E';
+                printf("Fim da rodada! Empate!\n");
             }
 
             if (jogo->mesa->pontosA >= 2) {
                 jogo->pontosA = jogo->pontosA + ponto;
-                printf("Fim da rodada! O time A ganhou %d pontos!\n", ponto);
+                printf("Fim do turno! O time A ganhou %d pontos!\n", ponto);
                 break;
-            } else if(jogo->mesa->pontosB >= 2) {
+            } else if (jogo->mesa->pontosB >= 2) {
                 jogo->pontosB = jogo->pontosB + ponto;
-                printf("Fim da rodada! O time B ganhou %d pontos!\n", ponto);
+                printf("Fim da turno! O time B ganhou %d pontos!\n", ponto);
                 break;
             }
         }
+        if(trucoMaoOnze == 'S') {
+            break;
+        }
+        ponto = 1;
+        aposta = 1;
+        recolher_cartas(jogo);
+        strcpy(jogo->mesa->resultado, "");
+        jogo->mesa->pontosB = 0;
+        jogo->mesa->pontosA = 0;
     }
 
-    printf("Fim de jogo!\n");
-    printf("O vencedor foi o time %c\n!", verifica_vencedor(jogo));
+    printf("\nFim de jogo!\n");
+    if(trucoMaoOnze == 'A') {
+        printf("O vencedor foi o time B!\n");
+    } else if(trucoMaoOnze == 'B') {
+        printf("O vencedor foi o time A!\n");
+    } else {
+        printf("Time A: %d pontos\n", jogo->pontosA);
+        printf("Time B: %d pontos\n", jogo->pontosB);
+        printf("O vencedor foi o time %c!\n", verifica_vencedor(jogo));
+    }
     printf("\nDeseja jogar novamente?\n");
 }
 
-char verifica_carta(Carta *carta1, Carta * carta2, Carta * vira, PilhaCarta *ordemCartas) {
-    if(carta1 == NULL) {
+void mostrarCarta(int rodada, Carta *carta, Jogador * jogador) {
+    if (rodada != 0) {
+        int aux = 0;
+        printf("Deseja esconder carta?\n");
+        printf("1 - Sim\n");
+        printf("2 - Não\n");
+        scanf("%d", &aux);
+        if (aux == 1) {
+            printf("Carta escondida\n");
+        } else {
+            printf("Carta jogada: %c de %s\n", carta->valor, carta->naipe);
+        }
+    } else {
+        printf("Carta jogada: %c de %s\n", carta->valor, carta->naipe);
+    }
+}
+
+char mao_de_onze(Jogo *jogo, char time) {
+    Jogador *auxJogador = jogo->mesa->jogadores;
+    PilhaCarta *aux = NULL;
+
+    printf("\nMão de Onze para o time %c\n", time);
+    int qtd = 0;
+    while (1) {
+        if (auxJogador->nome[0] == time) {
+            if (qtd == 0) {
+                printf("Suas cartas:\n");
+            } else {
+                printf("Cartas do parceiro:\n");
+            }
+            aux = auxJogador->cartas;
+            while (aux->prox != NULL) {
+                printf("%c de %s\n", aux->prox->valor->valor, aux->prox->valor->naipe);
+                aux = aux->prox;
+            }
+            qtd++;
+            if (qtd == 2) {
+                break;
+            }
+        }
+        auxJogador = auxJogador->prox;
+    }
+
+    printf("Aceitar partida?\n");
+    printf("1 - Sim\n");
+    printf("2 - Não\n");
+    int opcao = 0;
+    scanf("%d", &opcao);
+    if (opcao == 1) {
+        return '1';
+    } else {
+        return '0';
+    }
+}
+
+char verifica_carta(Carta *carta1, Carta *carta2, Carta *vira, PilhaCarta *ordemCartas) {
+    if (carta1 == NULL) {
         return '2';
-    } else if(carta2 == NULL) {
+    } else if (carta2 == NULL) {
         return '1';
     }
 
@@ -164,37 +348,45 @@ char verifica_carta(Carta *carta1, Carta * carta2, Carta * vira, PilhaCarta *ord
     int ordemCarta1;
     int ordemCarta2;
 
-    char valor = '0';
-    while(aux->prox != NULL) {
-        if(aux->prox->valor->valor != valor) {
-            valor = aux->prox->valor->valor;
-            if (aux->prox->valor->valor == vira->valor) {
-                manilha = aux->prox->prox->prox->prox->prox->valor;
-                break;
+    if(vira->valor == '3') {
+        manilha = (Carta *) malloc(sizeof(Carta));
+        manilha->valor = '4';
+    } else if(vira->valor == '7') {
+        manilha = (Carta *) malloc(sizeof(Carta));
+        manilha->valor = 'Q';
+    } else {
+        char valor = '0';
+        while (aux->prox != NULL) {
+            if (aux->prox->valor->valor != valor) {
+                valor = aux->prox->valor->valor;
+                if (aux->prox->valor->valor == vira->valor) {
+                    manilha = aux->prox->prox->prox->prox->prox->valor;
+                    break;
+                }
             }
+            aux = aux->prox;
         }
-        aux = aux->prox;
     }
 
     if (carta1->valor == manilha->valor && carta2->valor != manilha->valor) {
         return '1';
-    } else if  (carta2->valor == manilha->valor && carta1->valor != manilha->valor){
+    } else if (carta2->valor == manilha->valor && carta1->valor != manilha->valor) {
         return '2';
-    } else if(carta1->valor == manilha->valor && carta2->valor == manilha->valor) {
+    } else if (carta1->valor == manilha->valor && carta2->valor == manilha->valor) {
         ordemCarta1 = verifica_naipe(carta1);
         ordemCarta2 = verifica_naipe(carta2);
     } else {
-        valor = '0';
+        char valor = '0';
         aux = ordemCartas;
-        while(aux->prox != NULL) {
-            if(aux->prox->valor->valor != valor) {
+        while (aux->prox != NULL) {
+            if (aux->prox->valor->valor != valor) {
                 valor = aux->prox->valor->valor;
 
-                if(aux->prox->valor->valor == carta1->valor) {
+                if (aux->prox->valor->valor == carta1->valor) {
                     ordemCarta1 = ordemCarta;
                 }
 
-                if(aux->prox->valor->valor == carta2->valor) {
+                if (aux->prox->valor->valor == carta2->valor) {
                     ordemCarta2 = ordemCarta;
                 }
                 ordemCarta--;
@@ -203,24 +395,24 @@ char verifica_carta(Carta *carta1, Carta * carta2, Carta * vira, PilhaCarta *ord
         }
     }
 
-    if(ordemCarta1 > ordemCarta2) {
+    if (ordemCarta1 > ordemCarta2) {
         return '2';
-    } else if(ordemCarta1 < ordemCarta2) {
+    } else if (ordemCarta1 < ordemCarta2) {
         return '1';
     } else {
         return '0';
     }
 }
 
-int verifica_naipe(Carta * carta) {
+int verifica_naipe(Carta *carta) {
     int ordemCarta;
-    if(strcmp(carta->naipe, "Paus") == 0) {
+    if (strcmp(carta->naipe, "Paus") == 0) {
         ordemCarta = 1;
-    } else if(strcmp(carta->naipe, "Copas") == 0) {
+    } else if (strcmp(carta->naipe, "Copas") == 0) {
         ordemCarta = 2;
-    } else if(strcmp(carta->naipe, "Espadas") == 0) {
+    } else if (strcmp(carta->naipe, "Espadas") == 0) {
         ordemCarta = 3;
-    } else if(strcmp(carta->naipe, "Ouros") == 0) {
+    } else if (strcmp(carta->naipe, "Ouros") == 0) {
         ordemCarta = 4;
     }
     return ordemCarta;
@@ -236,22 +428,156 @@ char verifica_vencedor(Jogo *jogo) {
     }
 }
 
+int aumentarAposta(int aposta, char maoOnze) {
+    int opcao = 1;
+    if (maoOnze == '1') {
+        printf("1 - Pedir truco\n");
+        printf("2 - Fazer nada\n");
+        scanf("%d", &opcao);
+        if (opcao == 1) {
+            aposta = 0;
+        }
+    }
+    switch (aposta) {
+        case 1:
+            printf("1 - Pedir truco\n");
+            printf("2 - Fazer nada\n");
+            scanf("%d", &opcao);
+            if (opcao == 1) {
+                aposta = 3;
+            }
+            break;
+        case 3:
+            printf("1 - Pedir seis\n");
+            printf("2 - Fazer nada\n");
+            scanf("%d", &opcao);
+            if (opcao == 1) {
+                aposta = 6;
+            }
+            break;
+        case 6:
+            printf("1 - Pedir nove\n");
+            printf("2 - Fazer nada\n");
+            scanf("%d", &opcao);
+            if (opcao == 1) {
+                aposta = 9;
+            }
+            break;
+        case 9:
+            printf("1 - Pedir doze\n");
+            printf("2 - Fazer nada\n");
+            scanf("%d", &opcao);
+            if (opcao == 1) {
+                aposta = 12;
+            }
+            break;
+    }
+    return aposta;
+}
+
+int aceitarAposta(int aposta, Jogador *jogador) {
+    int opcao = 1;
+    Jogador *jogadorAtual = jogador;
+    printf("Jogador %s deseja aumentar a aposta?\n", jogadorAtual->prox->nome);
+    printf("Suas cartas:\n");
+    olharCartas(jogador->prox->cartas);
+    switch (aposta) {
+        case 3:
+            printf("1 - Aceitar truco\n");
+            printf("2 - Rejeitar truco\n");
+            scanf("%d", &opcao);
+            if (opcao == 1) {
+                printf("Aposta aumentada para 3 pontos\n");
+                aposta = 3;
+            } else {
+                aposta = 1;
+            }
+            break;
+        case 6:
+            printf("1 - Aceitar seis?\n");
+            printf("2 - Rejeitar seis\n");
+            scanf("%d", &opcao);
+            if (opcao == 1) {
+                printf("Aposta aumentada para 6 pontos\n");
+                aposta = 6;
+            } else {
+                aposta = 3;
+            }
+            break;
+        case 9:
+            printf("1 - Aceitar nove?\n");
+            printf("2 - Rejeitar nove\n");
+            scanf("%d", &opcao);
+            if (opcao == 1) {
+                printf("Aposta aumentada para 9 pontos\n");
+                aposta = 9;
+            } else {
+                aposta = 6;
+            }
+            break;
+        case 12:
+            printf("1 - Aceitar doze?\n");
+            printf("2 - Rejeitar doze\n");
+            scanf("%d", &opcao);
+            if (opcao == 1) {
+                printf("Aposta aumentada para 12 pontos\n");
+                aposta = 12;
+            } else {
+                aposta = 9;
+            }
+            break;
+    }
+    return aposta;
+}
+
+void olharCartas(PilhaCarta *cartas) {
+    PilhaCarta *aux = cartas;
+    while (aux->prox != NULL) {
+        printf("%c de %s\n",aux->prox->valor->valor, aux->prox->valor->naipe);
+        aux = aux->prox;
+    }
+}
+
 Carta *escolherCarta(PilhaCarta *cartas) {
     PilhaCarta *aux = cartas;
-    int escolha = 0;
-    while (aux != NULL) {
-        escolha++;
-        printf("%d - %c de %s\n", escolha, aux->valor->valor, aux->valor->naipe);
+    int tamanho = 0;
+    while (aux->prox != NULL) {
+        tamanho++;
+        printf("%d - %c de %s\n", tamanho, aux->prox->valor->valor, aux->prox->valor->naipe);
         aux = aux->prox;
     }
 
-    printf("Escolha uma carta: ");
-    scanf("%d", &escolha);
+    int escolha = 10;
+    while (1) {
+        printf("Escolha uma carta: ");
+        scanf("%d", &escolha);
+        if (escolha > tamanho) {
+            printf("Essa opção não existe\n");
+            continue;
+        }
+        break;
+    }
     Carta *carta = remover_carta(cartas, escolha);
     return carta;
 }
 
-PilhaCarta * distribuir_cartas(Jogo *jogo) {
+void recolher_cartas(Jogo *jogo) {
+    Jogador *jogador = jogo->mesa->jogadores;
+
+    for (int i = 0; i < 4; i++) {
+        PilhaCarta *cartas = jogador->cartas;
+        while (cartas != NULL) {
+            PilhaCarta *temp = cartas;
+            cartas = cartas->prox;
+            free(temp);
+        }
+        jogador->cartas = cartas;
+        jogador = jogador->prox;
+    }
+
+}
+
+PilhaCarta *distribuir_cartas(Jogo *jogo) {
     if (jogo->turno == 1) {
         int sorteioDistribui = rand() % 4;
         Jogador *atual = jogo->mesa->jogadores;
@@ -308,12 +634,14 @@ Carta *pop(PilhaCarta *topo) {
 }
 
 // adicionar na lista
-PilhaCarta * adicionar_carta(PilhaCarta *cartas, Carta *valor) {
+PilhaCarta *adicionar_carta(PilhaCarta *cartas, Carta *valor) {
     PilhaCarta *atual = cartas;
-    if(atual == NULL) {
+    if (atual == NULL) {
         atual = (PilhaCarta *) malloc(sizeof(PilhaCarta));
-        atual->valor = valor;
-        atual->prox = NULL;
+        PilhaCarta *carta = (PilhaCarta *) malloc(sizeof(PilhaCarta));
+        carta->valor = valor;
+        carta->prox = NULL;
+        atual->prox = carta;
         return atual;
     }
 
@@ -326,27 +654,27 @@ PilhaCarta * adicionar_carta(PilhaCarta *cartas, Carta *valor) {
     return cartas;
 }
 
-Carta * remover_carta(PilhaCarta *cartas, int posicao) {
-    PilhaCarta * atual = cartas;
-    PilhaCarta * aux = NULL;
-    Carta * valor = NULL;
+Carta *remover_carta(PilhaCarta *cartas, int posicao) {
+    PilhaCarta *atual = cartas;
+    PilhaCarta *aux = NULL;
+    Carta *valor = NULL;
     switch (posicao) {
         case 1:
-            valor = cartas->valor;
-            PilhaCarta *temp = cartas;
-            cartas = cartas->prox;
-            free(temp);
-            break;
-        case 2:
             valor = atual->prox->valor;
             aux = atual->prox->prox;
             free(atual->prox);
             atual->prox = aux;
             break;
-        case 3:
+        case 2:
             valor = atual->prox->prox->valor;
+            aux = atual->prox->prox->prox;
             free(atual->prox->prox);
-            atual->prox->prox = NULL;
+            atual->prox->prox = aux;
+            break;
+        case 3:
+            valor = atual->prox->prox->prox->valor;
+            free(atual->prox->prox->prox);
+            atual->prox->prox->prox = NULL;
             break;
     }
     return valor;

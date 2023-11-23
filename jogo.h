@@ -51,7 +51,7 @@ typedef struct mesa{
     int pontosB;
     struct jogador *jogadores;
     int rodada;
-    char resultado;
+    char resultado[3];
 }Mesa;
 
 typedef struct jogo{
@@ -153,4 +153,17 @@ PilhaCarta * adicionar_carta(PilhaCarta *cartas, Carta *valor);
 char verifica_carta(Carta *carta1, Carta * carta2, Carta * vira, PilhaCarta *ordemCartas) ;
 
 int verifica_naipe(Carta * carta);
+
+void recolher_cartas(Jogo *jogo);
+
+int aumentarAposta(int aposta, char maoOnze);
+
+int aceitarAposta(int aposta, Jogador * jogador);
+
+void mostrarCarta(int rodada, Carta *carta, Jogador * jogador);
+
+char mao_de_onze(Jogo * jogo, char time);
+
+void olharCartas(PilhaCarta *cartas);
+
 #endif //TRUCO_JOGO_H
